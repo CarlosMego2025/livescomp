@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: livescomp-web
+    runtime: php
+    buildCommand: ./build.sh
+    startCommand: php -S 0.0.0.0:10000
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DB_HOST
+        fromDatabase:
+          name: livescomp-db
+          property: connectionString
+      - key: DB_NAME
+        value: livescomp
+      - key: DB_USER
+        fromDatabase:
+          name: livescomp-db
+          property: username
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: livescomp-db
+          property: password
+
+databases:
+  - name: livescomp-db
+    plan: free
+    databaseName: livescomp
+    user: livescomp_user
