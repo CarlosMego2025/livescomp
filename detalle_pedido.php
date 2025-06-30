@@ -1,184 +1,158 @@
 <?php
-require_once 'includes/auth.php';
-require_once 'includes/funciones.php';
-require_once 'includes/database.php';
+require_once '../includes/config.php';
+require_once '../includes/Auth.php';
+require_once '../classes/Pedido.php';
 
-$db = new Database();
-$conn = $db->getConnection();
+// Verificar autenticación y rol de administrador o ejecutivo
+$auth->requireRole([ROL_ADMIN, ROL_EJECUTIVO]);
 
-// Obtener ID del pedido
-$pedido_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+// Verificar que se haya proporcionado un ID de pedido
+if (!isset($_GET['id'])) {
+    $_SESSION['flash_error'] = 'No se especificó el pedido';
+    redirect('pedidos.php');
+}
 
-// Obtener información del pedido
-$stmt = $conn->prepare("
-    SELECT p.*, u.nombre AS cliente_nombre, u.direccion, u.telefono 
-    FROM pedidos p
-    JOIN usuarios u ON p.usuario_id = u.id
-    WHERE p.id = ? AND p.usuario_id = ?
-");
-$stmt->execute([$pedido_id, $_SESSION['usuario_id']]);
-$pedido = $stmt->fetch(PDO::FETCH_ASSOC);
+// Instanciar modelo
+$pedidoModel = new Pedido();
+
+// Obtener detalles del pedido
+$pedidoId = intval($_GET['id']);
+$pedido = $pedidoModel->getByIdWithUser($pedidoId);
+$detalles = $pedidoModel->getDetalles($pedidoId);
 
 if (!$pedido) {
     $_SESSION['flash_error'] = 'Pedido no encontrado';
     redirect('pedidos.php');
 }
 
-// Obtener detalles del pedido
-$stmt = $conn->prepare("
-    SELECT dp.*, pr.nombre AS producto_nombre 
-    FROM detalle_pedido dp
-    JOIN productos pr ON dp.producto_id = pr.id
-    WHERE dp.pedido_id = ?
-");
-$stmt->execute([$pedido_id]);
-$detalles = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Si se solicita descargar PDF
-if (isset($_GET['pdf'])) {
-    require_once 'tcpdf/tcpdf.php';
-    
-    // Crear nuevo documento PDF
-    $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-    
-    // Configurar documento
-    $pdf->SetCreator('LivesComp');
-    $pdf->SetAuthor('LivesComp');
-    $pdf->SetTitle('Pedido #' . $pedido_id);
-    $pdf->SetSubject('Detalle de pedido');
-    
-    // Agregar una página
-    $pdf->AddPage();
-    
-    // Contenido HTML para el PDF
-    $html = '
-    <h1 style="text-align:center;">LivesComp - Pedido #' . $pedido_id . '</h1>
-    <table border="0" cellpadding="5">
-        <tr>
-            <td><strong>Fecha:</strong> ' . date('d/m/Y H:i', strtotime($pedido['fecha'])) . '</td>
-        </tr>
-        <tr>
-            <td><strong>Cliente:</strong> ' . $pedido['cliente_nombre'] . '</td>
-        </tr>
-        <tr>
-            <td><strong>Dirección:</strong> ' . $pedido['direccion'] . '</td>
-        </tr>
-        <tr>
-            <td><strong>Teléfono:</strong> ' . $pedido['telefono'] . '</td>
-        </tr>
-    </table>
-    
-    <h3>Detalle del Pedido</h3>
-    <table border="1" cellpadding="5">
-        <thead>
-            <tr>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Precio Unitario</th>
-                <th>Subtotal</th>
-            </tr>
-        </thead>
-        <tbody>';
-    
-    $total = 0;
-    foreach ($detalles as $detalle) {
-        $subtotal = $detalle['cantidad'] * $detalle['precio_unitario'];
-        $total += $subtotal;
-        $html .= '
-            <tr>
-                <td>' . $detalle['producto_nombre'] . '</td>
-                <td>' . $detalle['cantidad'] . '</td>
-                <td>' . formatPrice($detalle['precio_unitario']) . '</td>
-                <td>' . formatPrice($subtotal) . '</td>
-            </tr>';
-    }
-    
-    $html .= '
-            <tr>
-                <td colspan="3" align="right"><strong>Total:</strong></td>
-                <td><strong>' . formatPrice($total) . '</strong></td>
-            </tr>
-        </tbody>
-    </table>';
-    
-    // Escribir el contenido HTML
-    $pdf->writeHTML($html, true, false, true, false, '');
-    
-    // Salida del PDF (descarga)
-    $pdf->Output('pedido_' . $pedido_id . '.pdf', 'D');
-    exit;
-}
-
-include 'includes/header.php';
+// Incluir header
+include '../includes/header.php';
 ?>
 
-<div class="container mt-4">
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h4>Detalle del Pedido #<?= $pedido_id ?></h4>
-            <a href="detalle_pedido.php?id=<?= $pedido_id ?>&pdf=1" class="btn btn-primary">
-                <i class="fas fa-download"></i> Descargar PDF
-            </a>
-        </div>
-        <div class="card-body">
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <h5>Información del Pedido</h5>
-                    <p><strong>Fecha:</strong> <?= date('d/m/Y H:i', strtotime($pedido['fecha'])) ?></p>
-                    <p><strong>Estado:</strong> 
-                        <span class="badge badge-<?= 
-                            $pedido['estado'] === 'completado' ? 'success' : 
-                            ($pedido['estado'] === 'pendiente' ? 'warning' : 
-                            ($pedido['estado'] === 'aprobado' ? 'info' : 
-                            ($pedido['estado'] === 'enviado' ? 'primary' : 'danger')))
-                        ?>">
-                            <?= ucfirst($pedido['estado']) ?>
-                        </span>
-                    </p>
-                    <p><strong>Total:</strong> <?= formatPrice($pedido['total']) ?></p>
-                </div>
-                <div class="col-md-6">
-                    <h5>Información del Cliente</h5>
-                    <p><strong>Nombre:</strong> <?= $pedido['cliente_nombre'] ?></p>
-                    <p><strong>Dirección:</strong> <?= $pedido['direccion'] ?></p>
-                    <p><strong>Teléfono:</strong> <?= $pedido['telefono'] ?></p>
+<div class="container-fluid">
+    <div class="row">
+        <?php include 'includes/sidebar.php'; ?>
+        
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Detalle del Pedido #<?= $pedido['id'] ?></h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <a href="pedidos.php" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Volver a pedidos
+                    </a>
                 </div>
             </div>
             
-            <h5>Productos</h5>
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Producto</th>
-                            <th>Cantidad</th>
-                            <th>Precio Unitario</th>
-                            <th>Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        $total = 0;
-                        foreach ($detalles as $detalle): 
-                            $subtotal = $detalle['cantidad'] * $detalle['precio_unitario'];
-                            $total += $subtotal;
-                        ?>
-                            <tr>
-                                <td><?= $detalle['producto_nombre'] ?></td>
-                                <td><?= $detalle['cantidad'] ?></td>
-                                <td><?= formatPrice($detalle['precio_unitario']) ?></td>
-                                <td><?= formatPrice($subtotal) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <tr>
-                            <td colspan="3" class="text-right"><strong>Total</strong></td>
-                            <td><strong><?= formatPrice($total) ?></strong></td>
-                        </tr>
-                    </tbody>
-                </table>
+            <?php include '../includes/flash_messages.php'; ?>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Información del Pedido</h5>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-sm-4">Fecha:</dt>
+                                <dd class="col-sm-8"><?= date('d/m/Y H:i', strtotime($pedido['fecha_pedido'])) ?></dd>
+                                
+                                <dt class="col-sm-4">Estado:</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge 
+                                        <?= $pedido['estado'] === ESTADO_PENDIENTE ? 'bg-warning' : 
+                                           ($pedido['estado'] === ESTADO_APROBADO ? 'bg-info' : 
+                                           ($pedido['estado'] === ESTADO_ENVIADO ? 'bg-primary' : 
+                                           ($pedido['estado'] === ESTADO_COMPLETADO ? 'bg-success' : 'bg-danger'))) ?>">
+                                        <?= ucfirst($pedido['estado']) ?>
+                                    </span>
+                                </dd>
+                                
+                                <dt class="col-sm-4">Total:</dt>
+                                <dd class="col-sm-8">$<?= number_format($pedido['total'], 2) ?></dd>
+                                
+                                <dt class="col-sm-4">Método de Pago:</dt>
+                                <dd class="col-sm-8"><?= ucfirst($pedido['metodo_pago']) ?></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Información del Cliente</h5>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-sm-4">Nombre:</dt>
+                                <dd class="col-sm-8"><?= htmlspecialchars($pedido['usuario_nombre']) ?></dd>
+                                
+                                <dt class="col-sm-4">Email:</dt>
+                                <dd class="col-sm-8"><?= htmlspecialchars($pedido['usuario_email']) ?></dd>
+                                
+                                <dt class="col-sm-4">Teléfono:</dt>
+                                <dd class="col-sm-8"><?= htmlspecialchars($pedido['usuario_telefono'] ?? 'No especificado') ?></dd>
+                                
+                                <dt class="col-sm-4">Dirección:</dt>
+                                <dd class="col-sm-8"><?= htmlspecialchars($pedido['direccion_entrega']) ?></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Productos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Precio Unitario</th>
+                                    <th>Cantidad</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($detalles as $detalle): ?>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <?php if (!empty($detalle['imagen'])): ?>
+                                                    <img src="../assets/images/products/<?= $detalle['imagen'] ?>" 
+                                                         alt="<?= htmlspecialchars($detalle['nombre']) ?>" 
+                                                         width="50" class="me-3 img-thumbnail">
+                                                <?php endif; ?>
+                                                <div>
+                                                    <h6 class="mb-0"><?= htmlspecialchars($detalle['nombre']) ?></h6>
+                                                    <small class="text-muted"><?= htmlspecialchars($detalle['descripcion']) ?></small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>$<?= number_format($detalle['precio'], 2) ?></td>
+                                        <td><?= $detalle['cantidad'] ?></td>
+                                        <td>$<?= number_format($detalle['precio'] * $detalle['cantidad'], 2) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                    <td>$<?= number_format($pedido['total'], 2) ?></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 </div>
 
-<?php include 'includes/footer.php'; ?>
+<?php 
+// Incluir footer
+include '../includes/footer.php'; 
+?>
