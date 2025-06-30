@@ -43,5 +43,38 @@ function sanitize($data) {
 // Función para formatear precio
 function formatPrice($price) {
     return number_format($price, 2, '.', ',');
+}  
+function subirImagen($file, $folder) {
+    $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+    $maxSize = 2 * 1024 * 1024; // 2MB
+    
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowed)) {
+        throw new Exception("Formato de imagen no permitido. Use JPG, PNG o WEBP");
+    }
+    
+    if ($file['size'] > $maxSize) {
+        throw new Exception("La imagen es demasiado grande. Máximo 2MB");
+    }
+    
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        throw new Exception("Error al subir la imagen");
+    }
+    
+    $filename = uniqid() . '.' . $ext;
+    $uploadPath = APP_PATH . "/assets/images/$folder/" . $filename;
+    
+    if (!move_uploaded_file($file['tmp_name'], $uploadPath)) {
+        throw new Exception("Error al guardar la imagen");
+    }
+    
+    return $filename;
+}
+
+function eliminarImagen($filename, $folder) {
+    $path = APP_PATH . "/assets/images/$folder/" . $filename;
+    if (file_exists($path)) {
+        unlink($path);
+    }
 }
 ?>
