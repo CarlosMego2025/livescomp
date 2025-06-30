@@ -43,4 +43,18 @@ class Database {
         return $this->conn->lastInsertId();
     }
 }
+$host = getenv("DB_HOST");
+$port = getenv("DB_PORT");
+$dbname = getenv("DB_NAME");
+$user = getenv("DB_USER");
+$pass = getenv("DB_PASSWORD");
+
+try {
+    $conn = new PDO("pgsql:host=$host;port=$port;dbname=$dbname", $user, $pass);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // echo "Conexión exitosa";
+} catch (PDOException $e) {
+    echo "Error de conexión: " . $e->getMessage();
+    exit;
+}
 ?>
