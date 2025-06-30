@@ -1,4 +1,4 @@
- <?php
+<?php
 require_once '../includes/config.php';
 require_once '../includes/Auth.php';
 require_once '../classes/Pedido.php';
