@@ -1,26 +1,29 @@
 services:
   - type: web
     name: livescomp-web
-    runtime: php
-    buildCommand: ./build.sh
-    startCommand: php -S 0.0.0.0:10000
+    env: docker
+    plan: free
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: DB_HOST
         fromDatabase:
           name: livescomp-db
-          property: connectionString
+          property: host
       - key: DB_NAME
         value: livescomp
       - key: DB_USER
         fromDatabase:
           name: livescomp-db
-          property: username
+          property: user
       - key: DB_PASSWORD
         fromDatabase:
           name: livescomp-db
           property: password
+      - key: DB_PORT
+        fromDatabase:
+          name: livescomp-db
+          property: port
 
 databases:
   - name: livescomp-db
