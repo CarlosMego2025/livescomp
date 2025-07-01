@@ -4,6 +4,16 @@ require_once '../includes/Auth.php';
 require_once '../classes/Producto.php';
 require_once '../classes/Categoria.php';
 
+
+// Verificar autenticación
+$auth->requireRole(ROL_ADMIN);
+
+// Configurar título de página
+$tituloPagina = "Gestión de Productos";
+
+// Incluir header
+include '../includes/header.php'
+
 // Verificar autenticación y rol de administrador
 $auth->requireRole(ROL_ADMIN);
 
