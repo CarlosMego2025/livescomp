@@ -77,4 +77,31 @@ function eliminarImagen($filename, $folder) {
         unlink($path);
     }
 }
+// Función para mostrar mensajes flash
+function flashMessage() {
+    if (isset($_SESSION['flash_message'])) {
+        echo '<div class="alert alert-'.$_SESSION['flash_type'].'">'.$_SESSION['flash_message'].'</div>';
+        unset($_SESSION['flash_message']);
+        unset($_SESSION['flash_type']);
+    }
+}
+
+// Función para subir imágenes
+function uploadImage($file, $folder) {
+    $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    
+    if (!in_array($ext, $allowed)) {
+        throw new Exception("Formato de imagen no permitido");
+    }
+    
+    $filename = uniqid() . '.' . $ext;
+    $destination = "assets/images/$folder/" . $filename;
+    
+    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+        throw new Exception("Error al subir la imagen");
+    }
+    
+    return $filename;
+}
 ?>
