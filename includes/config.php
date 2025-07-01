@@ -36,4 +36,22 @@ define('ESTADO_CANCELADO', 'cancelado');
 session_start();
 error_reporting(ENVIRONMENT === 'development' ? E_ALL : 0);
 ini_set('display_errors', ENVIRONMENT === 'development' ? '1' : '0');
+// Configuración de la base de datos
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'livescomp');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+// Configuración de la aplicación
+define('APP_NAME', 'Livescomp');
+define('APP_URL', 'http://localhost/livescomp');
+
+// Iniciar sesión
+session_start();
+
+// Función para redireccionar
+function redirect($url) {
+    header("Location: $url");
+    exit;
+}
 ?>
