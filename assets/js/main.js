@@ -348,3 +348,30 @@ function handleFetchError(error) {
     console.error('Error:', error);
     showToast('Ocurrió un error al procesar la solicitud', 'danger');
 }
+// Función para actualizar el contador del carrito
+function updateCartCount() {
+    fetch('api/cart.php?action=count')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelectorAll('.cart-count').forEach(el => {
+                    el.textContent = data.count;
+                });
+            }
+        });
+}
+
+// Inicialización al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    // Actualizar contador del carrito
+    updateCartCount();
+    
+    // Menú móvil
+    const navbarToggler = document.querySelector('.navbar-toggler');
+    if (navbarToggler) {
+        navbarToggler.addEventListener('click', function() {
+            const target = this.getAttribute('data-bs-target');
+            document.querySelector(target).classList.toggle('show');
+        });
+    }
+});
